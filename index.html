@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redmine Task Viewer & Editor</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Side Menu -->
+        <nav class="side-menu">
+            <div class="menu-header">
+                <h2>Redmine Task</h2>
+            </div>
+            <ul class="menu-items">
+                <li class="menu-item active">
+                    <a href="#" data-section="taskList">
+                        <i class="fas fa-tasks"></i>
+                        <span>รายการงาน</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#" data-section="logTime">
+                        <i class="fas fa-clock"></i>
+                        <span>Log Time</span>
+                    </a>
+                </li>
+            </ul>
+            <div class="menu-footer">
+                <button id="themeToggle" class="theme-toggle">
+                    <i class="theme-icon">🌙</i>
+                </button>
+                <button id="logoutButton" class="logout-button">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <main>
+                <section id="taskList" class="active">
+                    <h2>รายการงาน</h2>
+                    <div class="filter-group">
+                        <div class="filter-header">
+                            <div class="filter-title">
+                                <label for="statusFilter">Status:</label>
+                                <span class="selected-statuses"></span>
+                            </div>
+                            <button class="collapse-btn" id="statusFilterCollapse">
+                                <i class="fas fa-chevron-up"></i>
+                            </button>
+                        </div>
+                        <div class="filter-content">
+                            <select id="statusFilter" multiple size="4">
+                                <option value="1">Create</option>
+                                <option value="10">Assigned</option>
+                                <option value="3">Develop</option>
+                                <option value="11">Integrate test (SIT)</option>
+                                <option value="6">Re-Programming</option>
+                                <option value="19">PRE</option>
+                                <option value="12">UAT</option>
+                                <option value="16">PRD</option>
+                                <option value="20">Monitor</option>
+                                <option value="5">Closed</option>
+                                <option value="17">Cancel</option>
+                                <option value="21">Inprogress</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="tasksContainer">
+                        <p>กำลังโหลดงาน...</p>
+                    </div>
+                </section>
+
+                <section id="logTime" class="hidden">
+                    <h2>Log Time</h2>
+                    <div class="log-time-controls">
+                        <div class="filter-group">
+                            <label for="monthFilter">เดือน:</label>
+                            <select id="monthFilter">
+                                <option value="">ทั้งหมด</option>
+                            </select>
+                        </div>
+                        <button id="btnRefreshLogTime">Refresh</button>
+                    </div>
+                    <div id="logTimeContainer">
+                        <p>กำลังโหลดข้อมูล...</p>
+                    </div>
+                </section>
+
+                <section id="taskDetail" class="hidden">
+                    <h2>รายละเอียดงาน</h2>
+                    <form id="taskForm">
+                        <input type="hidden" id="taskId">
+                        <div class="form-group">
+                            <label for="status">สถานะ:</label>
+                            <select id="status" required>
+                                <option value="">เลือกสถานะ</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="size">ขนาดงาน (Size):</label>
+                            <select id="size" required>
+                                <option value="">เลือกขนาด</option>
+                                <option value="SS &lt; 0.5 วัน">SS &lt; 0.5 วัน</option>
+                                <option value="S  = 0.5 วัน">S = 0.5 วัน</option>
+                                <option value="M = 1 วัน">M = 1 วัน</option>
+                                <option value="L = 2 วัน">L = 2 วัน</option>
+                                <option value="XL &gt; 2 วัน">XL &gt; 2 วัน</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" id="btnSaveTask">บันทึก</button>
+                            <button type="button" id="btnCancel">ยกเลิก</button>
+                        </div>
+                    </form>
+                    <iframe id="googdocForm" style="width: 100%;" class="hidden" src="https://docs.google.com/forms/d/e/1FAIpQLSfW7gOAzogAfVjY4-dVfHTcJXqTyoifI5aybRqt-aAbPP8DHQ/viewform"></iframe>
+                    <div id="taskDetailsContainer" class="task-details-container hidden">
+                        <h3>รายละเอียดงาน</h3>
+                        <div id="detailId"></div>
+                        <div id="detailSubject"></div>
+                        <div id="detailStatus"></div>
+                        <div id="detailProject"></div>
+                        <div id="detailAssignedTo"></div>
+                        <div id="detailDescription"></div>
+                        <div id="detailCreatedOn"></div>
+                        <div id="detailUpdatedOn"></div>
+                    </div>
+                    <button id="btnBackToList">กลับหน้ารายการ</button>
+                </section>
+            </main>
+            <footer class="app-footer">
+                <p>Powered by <a href="https://cursor.sh" target="_blank">Cursor AI</a></p>
+            </footer>
+        </div>
+    </div>
+
+    <div id="notification" class="notification-hidden"></div>
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
