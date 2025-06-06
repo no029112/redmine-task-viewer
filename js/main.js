@@ -1,3 +1,7 @@
+import config from './config.js';
+import { apiService } from './services/api.js';
+import { validateForm, commonRules } from './utils/validation.js';
+
 // ตั้งค่า Redmine URL และ API Key ของคุณ
 const REDMINE_URL = 'http://localhost:3001/redmine-api/redmine'; // แก้ไข URL ให้รวม /redmine
 const API_KEY = '927d2943f53b5a05d7abb4f7ad6dee71c7e17fe3';
@@ -62,7 +66,7 @@ const logTimeContainer = document.getElementById('logTimeContainer');
 function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
-    localStorage.setItem(STORAGE_KEYS.THEME, theme);
+    localStorage.setItem(config.STORAGE_KEYS.THEME, theme);
 }
 
 function toggleTheme() {
@@ -72,7 +76,7 @@ function toggleTheme() {
 }
 
 // Initialize theme from localStorage or default to light
-const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'light';
+const savedTheme = localStorage.getItem(config.STORAGE_KEYS.THEME) || config.DEFAULT_THEME;
 setTheme(savedTheme);
 
 // Add theme toggle event listener
@@ -165,50 +169,50 @@ async function fetchRedmine(endpoint, options = {}) {
 }
 
 async function loadTasks() {
-    tasksContainer.innerHTML = '<p>กำลังโหลดงาน...</p>';
+    showLoading();
     try {
-        // รวบรวม status_id ที่เลือกทั้งหมด
         const selectedStatuses = Array.from(statusFilter.selectedOptions).map(option => option.value);
-        
-        // สร้าง query parameter
         const queryParams = selectedStatuses.length > 0 
             ? `?status_id=${selectedStatuses.join('|')}` 
             : '';
             
-        const data = await fetchRedmine(`/issues.json${queryParams}`);
+        const data = await apiService.getIssues(queryParams);
         displayTasks(data.issues);
     } catch (error) {
-        tasksContainer.innerHTML = '<p>ไม่สามารถโหลดรายการงานได้ กรุณาลองใหม่อีกครั้ง</p>';
+        showNotification(`Error loading tasks: ${error.message}`, 5000);
+        tasksContainer.innerHTML = '<p>Unable to load tasks. Please try again later.</p>';
+    } finally {
+        hideLoading();
     }
 }
 
 async function loadTaskDetail(id) {
+    showLoading();
     try {
-        const data = await fetchRedmine(`/issues/${id}.json?include=attachments,relations,journals`);
+        const data = await apiService.getIssueDetail(id);
         displayTaskDetail(data.issue);
     } catch (error) {
-        showNotification(`ไม่สามารถโหลดรายละเอียดงาน ID: ${id} ได้`, 5000);
+        showNotification(`Error loading task details: ${error.message}`, 5000);
         showSection(taskListSection);
+    } finally {
+        hideLoading();
     }
 }
 
 async function loadStatuses() {
     try {
-        // Check if statuses are already in localStorage
-        const storedStatuses = localStorage.getItem(STORAGE_KEYS.STATUSES);
+        const storedStatuses = localStorage.getItem(config.STORAGE_KEYS.STATUSES);
         if (storedStatuses) {
             const statuses = JSON.parse(storedStatuses);
             populateStatusSelect(statuses);
             return;
         }
 
-        // If not in localStorage, fetch from API
-        const data = await fetchRedmine('/issue_statuses.json');
-        // Store in localStorage
-        localStorage.setItem(STORAGE_KEYS.STATUSES, JSON.stringify(data.issue_statuses));
+        const data = await apiService.getIssueStatuses();
+        localStorage.setItem(config.STORAGE_KEYS.STATUSES, JSON.stringify(data.issue_statuses));
         populateStatusSelect(data.issue_statuses);
     } catch (error) {
-        console.error('Error loading statuses:', error);
+        showNotification(`Error loading statuses: ${error.message}`, 5000);
     }
 }
 
@@ -223,68 +227,56 @@ function populateStatusSelect(statuses) {
 }
 
 async function saveTask(event) {
-    event.preventDefault(); // Prevent default form submission
-
-    const taskId = taskIdInput.value;
-    const statusId = statusSelect.value;
-    const sizeValue = sizeSelect.value;
-    const customFields = [
-        { id: 122, value: sizeValue }
-    ];
-    const taskData = {
-        issue: {
-            status_id: statusId || undefined,
-            custom_fields: customFields
-        }
+    event.preventDefault();
+    
+    const formData = {
+        subject: subjectInput.value,
+        status: statusSelect.value,
+        description: descriptionInput.value,
+        size: sizeSelect.value
     };
 
+    const { isValid, errors } = validateForm(formData, commonRules.task);
+    if (!isValid) {
+        Object.entries(errors).forEach(([field, error]) => {
+            showNotification(`${field}: ${error}`, 5000);
+        });
+        return;
+    }
+
+    showLoading();
     try {
-        let responseData;
-        if (isEditMode && taskId) {
-            // Update existing task
-            responseData = await fetchRedmine(`/issues/${taskId}.json`, {
-                method: 'PUT',
-                body: JSON.stringify(taskData)
-            });
-            showNotification('อัปเดตงานเรียบร้อยแล้ว!');
-            
-            // Show Google Form and issue details if status is Integrate test (ID 11)
-            if (statusId === '11') {
-               
-                document.getElementById('googdocForm').classList.remove('hidden');
-                taskDetailsContainer.classList.remove('hidden');
-                // Load and display task details
-                const data = await fetchRedmine(`/issues/${taskId}.json`);
-                displayTaskDetail(data.issue);
-            } else {
-                taskForm.classList.add('hidden');
-                showSection(taskListSection);
-                loadTasks();
+        const taskData = {
+            issue: {
+                status_id: formData.status,
+                custom_fields: [
+                    { id: 122, value: formData.size }
+                ]
             }
+        };
+
+        if (isEditMode && taskIdInput.value) {
+            await apiService.updateIssue(taskIdInput.value, taskData);
+            showNotification('Task updated successfully!');
         } else {
-            // Create new task
-            responseData = await fetchRedmine('/issues.json', {
-                method: 'POST',
-                body: JSON.stringify(taskData)
-            });
-            showNotification('สร้างงานใหม่เรียบร้อยแล้ว!');
-            
-            // Show Google Form and issue details if status is Integrate test (ID 11)
-            if (statusId === '11') {
-                taskForm.classList.add('hidden');
-                document.getElementById('googdocForm').classList.remove('hidden');
-                taskDetailsContainer.classList.remove('hidden');
-                // Load and display task details
-                const data = await fetchRedmine(`/issues/${responseData.issue.id}.json`);
-                displayTaskDetail(data.issue);
-            } else {
-                showSection(taskListSection);
-                loadTasks();
-            }
+            await apiService.createIssue(taskData);
+            showNotification('Task created successfully!');
         }
-        showSection(taskDetailSection);
+
+        if (formData.status === '11') {
+            taskForm.classList.add('hidden');
+            googdocForm.classList.remove('hidden');
+            taskDetailsContainer.classList.remove('hidden');
+            const data = await apiService.getIssueDetail(taskIdInput.value);
+            displayTaskDetail(data.issue);
+        } else {
+            showSection(taskListSection);
+            loadTasks();
+        }
     } catch (error) {
-        showNotification(`เกิดข้อผิดพลาดในการบันทึกงาน: ${error.message}`, 5000);
+        showNotification(`Error saving task: ${error.message}`, 5000);
+    } finally {
+        hideLoading();
     }
 }
 
@@ -539,8 +531,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadStatuses();
     
     // Set default selected values for status filter
-    const defaultStatuses = ['10', '3', '6']; // Assigned and Develop and reprogramming
-    defaultStatuses.forEach(statusId => {
+    config.DEFAULT_STATUSES.forEach(statusId => {
         const option = statusFilter.querySelector(`option[value="${statusId}"]`);
         if (option) {
             option.selected = true;

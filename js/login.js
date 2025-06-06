@@ -1,3 +1,7 @@
+import config from './config.js';
+import { apiService } from './services/api.js';
+import { validateForm, commonRules } from './utils/validation.js';
+
 // Constants for localStorage
 const STORAGE_KEYS = {
     USER: 'redmine_user',
@@ -15,7 +19,7 @@ const notification = document.getElementById('notification');
 
 // Check if user is already logged in
 function checkLogin() {
-    const user = localStorage.getItem(STORAGE_KEYS.USER);
+    const user = localStorage.getItem(config.STORAGE_KEYS.USER);
     if (user) {
         window.location.href = 'index.html';
     }
@@ -31,42 +35,35 @@ function showNotification(message, duration = 3000) {
 }
 
 // Handle login form submission
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const username = usernameInput.value;
-    const password = passwordInput.value;
+async function handleLogin(event) {
+    event.preventDefault();
+
+    const formData = {
+        username: usernameInput.value,
+        password: passwordInput.value
+    };
+
+    const { isValid, errors } = validateForm(formData, commonRules.login);
+    if (!isValid) {
+        Object.entries(errors).forEach(([field, error]) => {
+            showNotification(`${field}: ${error}`, 5000);
+        });
+        return;
+    }
 
     try {
-        // Try to fetch issues as a test of authentication
-        const response = await fetch(`${REDMINE_URL}/issues.json?limit=1`, {
-            headers: {
-                'Authorization': 'Basic ' + btoa(username + ':' + password),
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (response.ok) {
-            // Store user credentials
-            const userData = {
-                username,
-                password,
-                timestamp: new Date().getTime()
-            };
-            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
-            
-            // Redirect to main page
-            window.location.href = 'index.html';
-        } else {
-            const errorText = await response.text();
-            console.error('Login failed:', errorText);
-            showNotification('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 5000);
-        }
+        // Store user credentials
+        localStorage.setItem(config.STORAGE_KEYS.USER, JSON.stringify(formData));
+        
+        // Redirect to main page
+        window.location.href = 'index.html';
     } catch (error) {
-        console.error('Login error:', error);
-        showNotification('เกิดข้อผิดพลาดในการเข้าสู่ระบบ: ' + error.message, 5000);
+        showNotification(`Login failed: ${error.message}`, 5000);
     }
-});
+}
+
+// Event Listeners
+loginForm.addEventListener('submit', handleLogin);
 
 // Check login status when page loads
-checkLogin(); 
+document.addEventListener('DOMContentLoaded', checkLogin); 
